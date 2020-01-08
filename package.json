@@ -1,0 +1,23 @@
+{
+  "name": "@v9v/nodejs-bot-engine",
+  "version": "1.0.0",
+  "description": "Node.js bot engine",
+  "main": "dist/index.js",
+  "scripts": {
+    "prepublish": "npx typescript --declaration",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Yuri Vasilchikov",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/dotenv": "^8.2.0",
+    "@types/node": "^13.1.4",
+    "@types/node-telegram-bot-api": "^0.40.1",
+    "tslint": "^5.20.1",
+    "typescript": "^3.7.4"
+  },
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "node-telegram-bot-api": "^0.40.0"
+  }
+}
