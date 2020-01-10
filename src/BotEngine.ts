@@ -8,18 +8,13 @@ export default class BotEngine {
     constructor(private api: TelegramBot) {}
 
     public registerCommand(this: BotEngine, command: Command) {
-        if (this.registeredCommands.has(command.name)) {
-            throw new Error(`Command names collision occured: ${command.name}. Commands should have unique names.`);
+        if (this.validateCommand(command)) {
+            this.api.onText(command.trigger, command.reaction(this.api));
+            this.registeredCommands.add(command.name);
+
+            console.log('Registered command: ' + command.name);
         }
 
-        if (!command.trigger) {
-            throw new Error(`Command ${command.name} has no trigger`);
-        }
-
-        this.api.onText(command.trigger, command.reaction(this.api));
-        this.registeredCommands.add(command.name);
-
-        console.log('Registered command: ' + command.name);
         return this;
     }
 
@@ -71,5 +66,19 @@ export default class BotEngine {
         });
 
         return this;
+    }
+
+    private validateCommand(command: Command): boolean {
+        if (this.registeredCommands.has(command.name)) {
+            console.error(`Command names collision occured: ${command.name}. Commands should have unique names.`);
+            return false;
+        }
+
+        if (!command.trigger) {
+            console.error(`Command ${command.name} has no trigger`);
+            return false;
+        }
+
+        return true;
     }
 }
