@@ -1,35 +1,39 @@
-interface BotConfig {
+export interface BotConfig {
     telegramBotToken: string;
 }
 
-// when message received new BotApi instance created with binding to proper channel API
-interface BotApi {
-    sendMessage: (message: Message) => void;
+/**
+ * On every message received new BotApi instance created
+ * with bindings to proper channel API, chat id etc.
+ */
+export interface BotApi {
+    sendMessage: (text: string) => void;
     sendSheet: (sheet: Sheet) => void;
     sendFile: (file: Buffer) => void;
 }
 
-interface Message {
-    text: string;
-    user: User;
+export enum Channel {
+    Telegram = 'Telegram',
 }
 
-interface Sheet {
+export interface Message {
+    channel: Channel;
+    text: string;
+    userId: string;
+}
+
+export interface Sheet {
     columns: string[];
     rows: string[][];
 }
 
-interface User {
-    telegramId: number;
-}
-
-interface Command {
+export interface Command {
     name: string;
     triggers: RegExp[];
     reaction: (bot: BotApi, msg: Message) => void;
 }
 
-interface Feature {
+export interface Feature {
     name: string;
     commands: Record<string, Command>;
     fallback: Command;
