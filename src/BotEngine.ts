@@ -1,6 +1,11 @@
 import TelegramBot = require('node-telegram-bot-api');
-import { BotConfig, BotApi, Message, Sheet, Command, Feature, Channel } from './interfaces';
+import { BotConfig, BotSpeechApi, Message, Sheet, Command, Feature, Messenger } from './interfaces';
 import * as re from './re';
+import TelegramApiAdapter, { IBotApiAdapter } from './adapters/TelegramApiAdapter';
+
+const ADAPTER_MAP: Record<Messenger, any> = {
+    [Messenger.Telegram]: TelegramApiAdapter,
+}
 
 export interface IBotEngine {
     registerCommand: (command: Command) => void;
@@ -9,35 +14,22 @@ export interface IBotEngine {
 }
 
 export default class BotEngine implements IBotEngine {
-    private registeredCommands = new Set<string>([]);
-    private api: TelegramBot;
-    private botApi: BotApi;
+    private commandsRegistry = new Set<string>([]);
+    private apiAdapter: IBotApiAdapter;
 
-    constructor(config: BotConfig) {
-        this.api = new TelegramBot(config.telegramBotToken, { polling: true });
+    constructor(messenger: Messenger, secret: string) {
+        this.apiAdapter = new ADAPTER_MAP[messenger](secret);
     }
 
     public registerCommand(command: Command) {
-        const validationResult = this.validateCommand(command);
-        if (validationResult) {
-            throw new Error(validationResult);
+        const validationError = this.validateCommand(command);
+        if (validationError) {
+            throw new Error(validationError);
         }
 
         const { triggers, reaction, name } = command;
-
-        triggers.forEach(trigger =>
-            this.api.onText(trigger, (msg: TelegramBot.Message) => {
-                const botApi = this.createApiTelegram(msg);
-                const message: Message = {
-                    channel: Channel.Telegram,
-                    text: msg.text,
-                    userId: msg.from.id.toString(),
-                };
-                reaction(botApi, message);
-            }),
-        );
-
-        this.registeredCommands.add(name);
+        triggers.forEach((trigger) => this.apiAdapter.onText(trigger, reaction));
+        this.commandsRegistry.add(name);
         console.log('Registered command: ' + name);
 
         return this;
@@ -52,10 +44,10 @@ export default class BotEngine implements IBotEngine {
         const { name, commands, fallback } = feature;
         const commandNames = Object.keys(commands);
 
-        this.registeredCommands.add(name);
+        this.commandsRegistry.add(name);
         console.log(`Command set: ${name} ---`);
 
-        commandNames.forEach(commandName => {
+        commandNames.forEach((commandName) => {
             commands[commandName].triggers.push(re.featureCommand(name, commandName));
             this.registerCommand(commands[commandName]);
         });
@@ -69,10 +61,10 @@ export default class BotEngine implements IBotEngine {
     }
 
     public registerFallback() {
-        const commandNames = [...this.registeredCommands];
+        const commandNames = [...this.commandsRegistry];
 
         const triggers = [re.globalFallback(commandNames)];
-        const reaction = (bot: BotApi) => {
+        const reaction = (bot: BotSpeechApi) => {
             bot.sendMessage(`commands:\n${commandNames.join('\n')}`);
         };
 
@@ -80,7 +72,7 @@ export default class BotEngine implements IBotEngine {
     }
 
     private validateCommand(command: Command): string | undefined {
-        if (this.registeredCommands.has(command.name)) {
+        if (this.commandsRegistry.has(command.name)) {
             return `Command names collision occured: ${command.name}. Commands should have unique names.`;
         }
 
@@ -88,33 +80,18 @@ export default class BotEngine implements IBotEngine {
             return `Command ${command.name} has no triggers`;
         }
 
-        if (command.triggers.map(t => t instanceof RegExp).includes(false)) {
+        if (command.triggers.map((t) => t instanceof RegExp).includes(false)) {
             return `Command ${command.name} triggers array contains invalid element`;
         }
     }
 
     private validateFeature(feature: Feature): string | undefined {
-        if (this.registeredCommands.has(feature.name)) {
+        if (this.commandsRegistry.has(feature.name)) {
             return `Command names collision occured: ${name}. Commands should have unique names.`;
         }
 
         if (!feature.commands?.length) {
             return `Feature ${feature.name} has no commands`;
         }
-    }
-
-    // TODO: extract to BotApi class with constructor overloading
-    private createApiTelegram(msg: TelegramBot.Message): BotApi {
-        return {
-            sendMessage: (text: string) => {
-                this.api.sendMessage(msg.chat.id, text);
-            },
-            sendSheet: (sheet: Sheet) => {
-                // this.api.sendMessage(msg.chat.id, sheetToMsg(sheet));
-            },
-            sendFile: (file: Buffer) => {
-                // this.api.sendDocument(msg.chat.id, doc);
-            },
-        };
     }
 }
