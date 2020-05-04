@@ -1,9 +1,6 @@
 import TelegramBot = require('node-telegram-bot-api');
-import { Message, Messenger, Sheet, Reaction, BotSpeechApi } from '../interfaces';
-
-export interface IBotApiAdapter {
-    onText: (trigger: RegExp, reaction: Reaction) => void;
-}
+import { IBotApiAdapter, BotSpeechApi, CommonMessage, Messenger, SheetData, Reaction } from '../interfaces';
+import { ParseMode } from 'node-telegram-bot-api';
 
 export default class TelegramApiAdapter implements IBotApiAdapter {
     private api: TelegramBot;
@@ -12,29 +9,31 @@ export default class TelegramApiAdapter implements IBotApiAdapter {
         this.api = new TelegramBot(secret, { polling: true });
     }
 
-    public onText(trigger: RegExp, reaction: Reaction) {
+    public onText(this: TelegramApiAdapter, trigger: RegExp, reaction: Reaction) {
         this.api.onText(trigger, (rawMessage: TelegramBot.Message) => {
             const speechApi = this.makeSpeechApi(rawMessage);
-            const message: Message = {
-                messenger: Messenger.Telegram,
-                text: rawMessage.text,
-                userId: rawMessage.from.id.toString(),
-            };
+            const message = this.makeCommonMessage(rawMessage);
             reaction(speechApi, message);
         });
     }
 
-    private makeSpeechApi(msg: TelegramBot.Message): BotSpeechApi {
+    private makeSpeechApi(this: TelegramApiAdapter, msg: TelegramBot.Message): BotSpeechApi {
+        const telegramApi = this.api;
         return {
             sendMessage(text: string) {
-                this.api.sendMessage(msg.chat.id, text);
+                telegramApi.sendMessage(msg.chat.id, text, { parse_mode: 'HTML' as ParseMode });
             },
-            sendSheet(sheet: Sheet) {
-                // this.api.sendMessage(msg.chat.id, sheetToMsg(sheet));
-            },
-            sendFile(file: Buffer) {
-                // this.api.sendDocument(msg.chat.id, doc);
+            sendFile(file: Buffer, fileName: string, contentType: string) {
+                telegramApi.sendDocument(msg.chat.id, file, {}, { filename: fileName, contentType });
             },
         };
+    }
+
+    private makeCommonMessage(rawMessage: TelegramBot.Message) {
+        return {
+            messenger: Messenger.Telegram,
+            text: rawMessage.text,
+            userId: rawMessage.from.id.toString(),
+        } as CommonMessage;
     }
 }

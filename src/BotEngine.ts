@@ -1,16 +1,9 @@
-import TelegramBot = require('node-telegram-bot-api');
-import { BotConfig, BotSpeechApi, Message, Sheet, Command, Feature, Messenger } from './interfaces';
+import { IBotEngine, IBotApiAdapter, BotSpeechApi, Command, Feature, Messenger } from './interfaces';
 import * as re from './re';
-import TelegramApiAdapter, { IBotApiAdapter } from './adapters/TelegramApiAdapter';
+import TelegramApiAdapter from './adapters/TelegramApiAdapter';
 
 const ADAPTER_MAP: Record<Messenger, any> = {
     [Messenger.Telegram]: TelegramApiAdapter,
-}
-
-export interface IBotEngine {
-    registerCommand: (command: Command) => void;
-    registerFeature: (feature: Feature) => void;
-    registerFallback: () => void;
 }
 
 export default class BotEngine implements IBotEngine {
