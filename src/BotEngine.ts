@@ -41,10 +41,12 @@ export default class BotEngine implements IBotEngine {
         console.log(`Command set: ${name} ---`);
 
         commandNames.forEach((commandName) => {
+            commands[commandName].triggers = commands[commandName].triggers || [];
             commands[commandName].triggers.push(re.featureCommand(name, commandName));
             this.registerCommand(commands[commandName]);
         });
 
+        fallback.triggers = fallback.triggers || [];
         fallback.triggers.push(re.featureFallback(name, commandNames));
         this.registerCommand(fallback);
 
@@ -83,7 +85,7 @@ export default class BotEngine implements IBotEngine {
             return `Command names collision occured: ${name}. Commands should have unique names.`;
         }
 
-        if (!feature.commands?.length) {
+        if (!Object.keys(feature.commands).length) {
             return `Feature ${feature.name} has no commands`;
         }
     }
