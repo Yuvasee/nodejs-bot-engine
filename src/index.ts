@@ -1,6 +1,4 @@
 import BotEngine from './BotEngine';
-import Command from './interfaces/Command';
-import CommandSet from './interfaces/CommandSet';
+export * from './interfaces';
 
 export default BotEngine;
-export { BotEngine, Command, CommandSet };

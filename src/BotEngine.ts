@@ -1,49 +1,53 @@
-import TelegramBot = require('node-telegram-bot-api');
-import Command from './interfaces/Command';
-import CommandSet from './interfaces/CommandSet';
+import { IBotEngine, IBotApiAdapter, BotSpeechApi, Command, Feature, Messenger } from './interfaces';
+import * as re from './re';
+import TelegramApiAdapter from './adapters/TelegramApiAdapter';
 
-export default class BotEngine {
-    private registeredCommands = new Set<string>([]);
+const ADAPTER_MAP: Record<Messenger, any> = {
+    [Messenger.Telegram]: TelegramApiAdapter,
+}
 
-    constructor(private api: TelegramBot) {}
+export default class BotEngine implements IBotEngine {
+    private commandsRegistry = new Set<string>([]);
+    private apiAdapter: IBotApiAdapter;
 
-    public registerCommand(this: BotEngine, command: Command) {
-        if (this.registeredCommands.has(command.name)) {
-            throw new Error(`Command names collision occured: ${command.name}. Commands should have unique names.`);
+    constructor(messenger: Messenger, secret: string) {
+        this.apiAdapter = new ADAPTER_MAP[messenger](secret);
+    }
+
+    public registerCommand(command: Command) {
+        const validationError = this.validateCommand(command);
+        if (validationError) {
+            throw new Error(validationError);
         }
 
-        if (!command.trigger) {
-            throw new Error(`Command ${command.name} has no trigger`);
-        }
+        const { triggers, reaction, name } = command;
+        triggers.forEach((trigger) => this.apiAdapter.onText(trigger, reaction));
+        this.commandsRegistry.add(name);
+        console.log('Registered command: ' + name);
 
-        this.api.onText(command.trigger, command.reaction(this.api));
-        this.registeredCommands.add(command.name);
-
-        console.log('Registered command: ' + command.name);
         return this;
     }
 
-    public registerCommandSet(this: BotEngine, commandSet: CommandSet) {
-        const { name: setName, commands, fallback } = commandSet;
+    public registerFeature(feature: Feature) {
+        const validationResult = this.validateFeature(feature);
+        if (validationResult) {
+            throw new Error(validationResult);
+        }
+
+        const { name, commands, fallback } = feature;
         const commandNames = Object.keys(commands);
 
-        if (this.registeredCommands.has(setName)) {
-            throw new Error(`Command names collision occured: ${setName}. Commands should have unique names.`);
-        }
-        this.registeredCommands.add(setName);
+        this.commandsRegistry.add(name);
+        console.log(`Command set: ${name} ---`);
 
-        console.log(`Command set: ${setName} ---`);
-
-        commandNames.forEach(commandName => {
-            // matches "setName commandName..."
-            const reKnownCmd = `^${setName}[ \\t]+${commandName}([ \\t]+.*)?$`;
-            commands[commandName].trigger = new RegExp(reKnownCmd);
+        commandNames.forEach((commandName) => {
+            commands[commandName].triggers = commands[commandName].triggers || [];
+            commands[commandName].triggers.push(re.featureCommand(name, commandName));
             this.registerCommand(commands[commandName]);
         });
 
-        // matches "setName" and "setName not(one|of|commandNames)..."
-        const reFallbackCmd = `^${setName}(?!\\S|([ \\t]+)?(${commandNames.join('|')}))`;
-        fallback.trigger = new RegExp(reFallbackCmd);
+        fallback.triggers = fallback.triggers || [];
+        fallback.triggers.push(re.featureFallback(name, commandNames));
         this.registerCommand(fallback);
 
         console.log(`---`);
@@ -51,25 +55,38 @@ export default class BotEngine {
         return this;
     }
 
-    public registerFallback(this: BotEngine) {
-        // matches minus command
-        const reMinusSum = '-\\d+(?:[.,]\\d+)?(?:[+\\-*\\/]\\d+(?:[.,]\\d+)?)*';
-        const commands = [...this.registeredCommands];
-        const commandsJoined = commands.join('|');
+    public registerFallback() {
+        const commandNames = [...this.commandsRegistry];
 
-        // matches all but valid commands
-        const reFallbackGlobal = `^(?!(${reMinusSum}|${commandsJoined})).+|^(${commandsJoined})\\w+.*`;
+        const triggers = [re.globalFallback(commandNames)];
+        const reaction = (bot: BotSpeechApi) => {
+            bot.sendMessage(`commands:\n${commandNames.join('\n')}`);
+        };
 
-        this.registerCommand({
-            name: 'global fallback',
+        this.registerCommand({ name: 'global fallback', triggers, reaction });
+    }
 
-            trigger: new RegExp(reFallbackGlobal),
+    private validateCommand(command: Command): string | undefined {
+        if (this.commandsRegistry.has(command.name)) {
+            return `Command names collision occured: ${command.name}. Commands should have unique names.`;
+        }
 
-            reaction: botApi => (msg, match) => {
-                botApi.sendMessage(msg.chat.id, `commands: \n${commands.join('\n')}`);
-            },
-        });
+        if (!command.triggers?.length) {
+            return `Command ${command.name} has no triggers`;
+        }
 
-        return this;
+        if (command.triggers.map((t) => t instanceof RegExp).includes(false)) {
+            return `Command ${command.name} triggers array contains invalid element`;
+        }
+    }
+
+    private validateFeature(feature: Feature): string | undefined {
+        if (this.commandsRegistry.has(feature.name)) {
+            return `Command names collision occured: ${name}. Commands should have unique names.`;
+        }
+
+        if (!Object.keys(feature.commands).length) {
+            return `Feature ${feature.name} has no commands`;
+        }
     }
 }
