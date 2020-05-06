@@ -1,10 +1,11 @@
 {
   "name": "@v9v/nodejs-bot-engine",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Node.js bot engine",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "build": "rimraf dist && npx typescript --declaration",
+    "build": "rimraf dist && npx typescript",
     "prepublish": "npm run build",
     "test": "jest --watch",
     "coverage": "jest --coverage"
