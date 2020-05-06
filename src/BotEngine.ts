@@ -4,7 +4,7 @@ import TelegramApiAdapter from './adapters/TelegramApiAdapter';
 
 const ADAPTER_MAP: Record<Messenger, any> = {
     [Messenger.Telegram]: TelegramApiAdapter,
-}
+};
 
 export default class BotEngine implements IBotEngine {
     private commandsRegistry = new Set<string>([]);

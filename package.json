@@ -1,8 +1,8 @@
 {
   "name": "@v9v/nodejs-bot-engine",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Node.js bot engine",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
   "scripts": {
     "build": "rimraf dist && npx typescript --declaration",
     "prepublish": "npm run build",
